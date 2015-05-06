@@ -638,6 +638,8 @@ class uixul_DocumentEditorService extends BaseService
 		$element = $elementArray[0];
 		return DocumentHelper::expandAllowAttribute($element->value);
 	}
+
+
 	
 	public static function XSLSetDefaultPanelInfo($elementArray)
 	{
@@ -647,7 +649,7 @@ class uixul_DocumentEditorService extends BaseService
 		{
 			throw new Exception('Invalid empty panel name');
 		}
-		
+
 		if (isset(self::$stdPanels[$panelName]))
 		{
 			$extraInfo = self::$stdPanels[$panelName];
@@ -672,9 +674,9 @@ class uixul_DocumentEditorService extends BaseService
 		{
 			$element->setAttribute('icon', $extraInfo['icon']);
 		}
-		return '';
+		return $element;
 	}
-	
+
 	public static function XSLGetBindingId($moduleName, $documentName, $panelName)
 	{
 		self::$XSLCurrentModule = $moduleName;
@@ -713,7 +715,7 @@ class uixul_DocumentEditorService extends BaseService
 				$element->setAttribute('hidehelp', 'true');
 			}
 		}
-		return '';
+		return $element;
 	}
 		
 	public static function XSLFieldsName()
@@ -784,6 +786,22 @@ class uixul_DocumentEditorService extends BaseService
 				$element->setAttribute('allow', $doctype);
 			}
 			$type = ($property->isArray()) ? "documentarray" : "document";
+			if ($type == "documentarray")
+			{
+				$constraintArray = array();
+				$minOccurs = $property->getMinOccurs();
+				if ($minOccurs > 0)
+				{
+					$constraintArray['minSizeArray'] = $minOccurs;
+				}
+				// case -1 (for no limit) : no constraint.
+				$maxOccurs = $property->getMaxOccurs();
+				if ($maxOccurs > 1)
+				{
+					$constraintArray['maxSizeArray'] = $maxOccurs;
+				}
+				self::addContraints($element, $constraintArray);
+			}
 		}
 		else
 		{
@@ -848,6 +866,24 @@ class uixul_DocumentEditorService extends BaseService
 				$cn->setAttribute('name', $name);
 				$cn->setAttribute('parameter', $value);
 			}
+		}
+	}
+	
+	/**
+	 * @param DOMElement $element
+	 * @param array $constraintArray
+	 */
+	protected static function addContraints($element, $constraintArray)
+	{
+		foreach ($constraintArray as $name => $value)
+		{
+			if ($name === 'blank')
+			{
+				continue;
+			}
+			$cn = $element->appendChild($element->ownerDocument->createElement('constraint'));
+			$cn->setAttribute('name', $name);
+			$cn->setAttribute('parameter', $value);
 		}
 	}
 	
@@ -1689,8 +1725,15 @@ class uixul_DocumentEditorService extends BaseService
 						}
 						
 						$content = file_get_contents($defPath);
-						$tr = uixul_lib_DocumentEditorPanelTagReplacer::getInstance($panelName, $moduleName, $model->getName());
-						$panelDefDoc = f_util_DOMUtils::fromString($tr->run($content));
+						if ($panelName !== 'publication')
+						{
+							$tr = uixul_lib_DocumentEditorPanelTagReplacer::getInstance($panelName, $moduleName, $model->getName());
+							$panelDefDoc = f_util_DOMUtils::fromString($tr->run($content));
+						}
+						else
+						{
+							$panelDefDoc = f_util_DOMUtils::fromString($content);
+						}
 						f_util_DOMUtils::save($panelDefDoc, $panelPath);
 						echo "$panelPath generated\n";							
 					break;
